@@ -1,37 +1,41 @@
 #lang racket
 
-;; require pyffi with members prefixed as py/
-(require (prefix-in py/ pyffi))
+;; require pyffi with members prefixed as pyffi/
+(require (prefix-in pyffi/ pyffi))
+
+;; provides token struct and related utils
+(require (prefix-in token/ "token.rkt"))
 
 ;; load the python interpreter
 ;; https://soegaard.github.io/pyffi/An_introduction_to_pyffi.html
-(py/initialize)
-(py/post-initialize)
+(pyffi/initialize)
+(pyffi/post-initialize)
 
 ;; load the tokenizer
 ;; https://docs.python.org/3/library/tokenize.html
-(py/import tokenize)
+(pyffi/run* "import tokenize")
 
 ;; load python's io library
-(py/import io)
+(pyffi/import io)
 
 ;; native tokenization method helpers
-(define py/str->bytesio
-  (py/run "lambda s: io.BytesIO(s.encode('utf-8'))"))
+(define py:str->bytesio
+  (pyffi/run "lambda s: io.BytesIO(s.encode('utf-8'))"))
 
-(define py/bytesio->token-generator
-  (py/run "lambda io: tokenize.tokenize(io.readline)"))
+(define py:bytesio->token-generator
+  (pyffi/run "lambda io: tokenize.tokenize(io.readline)"))
 
-(define (py/token-seq py-src)
-  (py/in-pygenerator
-    (py/bytesio->token-generator
-      (py/str->bytesio py-src))))
+;; tokenizer which returns seq of python tokens
+;; https://docs.python.org/3/library/tokenize.html
+(define (tokenize-raw py-src)
+  (pyffi/in-pygenerator
+    (py:bytesio->token-generator
+      (py:str->bytesio py-src))))
 
-(define (py/token-list py-src)
-  (sequence->list (py/token-seq py-src)))
+;; tokenizer which returns native struct of tokens
+(define (tokenize py-src)
+  (sequence-map token/pytoken->token
+                (tokenize-raw py-src)))
 
-;; Provide tokenizer as py/token-seq
-(provide py/token-seq)
-
-;; Provide tokenizer as py/token-list
-(provide py/token-list)
+;; Provide tokenizer
+(provide tokenize)
