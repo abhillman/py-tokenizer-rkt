@@ -1,6 +1,6 @@
 #lang racket
 
-;; Needed for fetching attributes due; for more info:
+;; Needed for fetching attributes; for more info:
 ;; * https://github.com/soegaard/pyffi/issues/2
 ;; * https://github.com/soegaard/pyffi/issues/3
 (require (only-in pyffi [getattr pyffi/getattr]))
