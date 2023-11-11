@@ -1,41 +1,35 @@
+#!/usr/bin/env racket
 #lang racket
 
-;; require pyffi with members prefixed as pyffi/
-(require (prefix-in pyffi/ pyffi))
+(require "lib/hash.rkt")
+(require "lib/json.rkt")
+(require "lib/tokenize.rkt")
 
-;; provides token struct and related utils
-(require (prefix-in token/ "token.rkt"))
+(define args (current-command-line-arguments))
 
-;; load the python interpreter
-;; https://soegaard.github.io/pyffi/An_introduction_to_pyffi.html
-(pyffi/initialize)
-(pyffi/post-initialize)
+(define (print-usage)
+   (display "Usage: ./tokenize.rkt <fmt:{json, rkt-list, rkt-hash}> '<py-src>'" (current-error-port))
+   (display "\n\nExamples:" (current-error-port))
+   (display "\n    Simplest example that shows tokens for `def hi(): pass`" (current-error-port))
+   (display "\n    $ ./tokenize.rkt json 'def hi(): pass'" (current-error-port))
+   (display "\n\n    Reading in a python file:" (current-error-port))
+   (display "\n    $ ./tokenize.rkt rkt-list \"$(cat prog.py)\"" (current-error-port))
+   (display "\n\n    This one is quite fun -- tokenize python's tokenizer:`" (current-error-port))
+   (display "\n    $ ./tokenize.rkt json \"$(curl -s https://raw.githubusercontent.com/python/cpython/3.12/Lib/tokenize.py)\" | jq | less" (current-error-port))
+   (display "\n\nBuilt with gratitude to the pyffi library https://github.com/soegaard/pyffi."))
 
-;; load the tokenizer
-;; https://docs.python.org/3/library/tokenize.html
-(pyffi/run* "import tokenize")
+(cond
+ [(not (equal? (vector-length args) 2)) ((print-usage) (exit 1))])
 
-;; load python's io library
-(pyffi/import io)
+(define fmt (vector-ref args 0))
+(define py-src (vector-ref args 1))
 
-;; native tokenization method helpers
-(define py:str->bytesio
-  (pyffi/run "lambda s: io.BytesIO(s.encode('utf-8'))"))
+(match fmt
+  ["json" (display (tokens->json (tokenize py-src)))]
+  ["rkt-list" (display (sequence->list (tokenize py-src)))]
+  ["rkt-hash" (display (sequence->list (sequence-map token->hash (tokenize py-src))))]
+  [_ ((print-usage) (exit 1))]) 
 
-(define py:bytesio->token-generator
-  (pyffi/run "lambda io: tokenize.tokenize(io.readline)"))
 
-;; tokenizer which returns seq of python tokens
-;; https://docs.python.org/3/library/tokenize.html
-(define (tokenize-raw py-src)
-  (pyffi/in-pygenerator
-    (py:bytesio->token-generator
-      (py:str->bytesio py-src))))
 
-;; tokenizer which returns native struct of tokens
-(define (tokenize py-src)
-  (sequence-map token/pytoken->token
-                (tokenize-raw py-src)))
 
-;; Provide tokenizer
-(provide tokenize)
